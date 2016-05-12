@@ -89,7 +89,7 @@
                 </div>
                 <label class="col-md-3 col-sm-4 control-label" for="newPatientIdentifierType">{{msg('openMRS.config.patientIdentifierType')}}</label>
                 <div class="col-md-9 col-sm-8 form-inline">
-                    <input class="form-control input-xlarge-fluid" ng-model="newPatientIdentifierType.name" type="text" id="newPatientIdentifierType"/>
+                    <input class="form-control input-xlarge-fluid" ng-change="draftChanged()" ng-model="newPatientIdentifierType.name" type="text" id="newPatientIdentifierType"/>
                     <div class="form-hints">
                         <span ng-if="patientIdentifierTypeNameExists()" class="form-hint-error">{{msg('openMRS.config.error.patientIdentifierTypeExists')}}</span>
                     </div>

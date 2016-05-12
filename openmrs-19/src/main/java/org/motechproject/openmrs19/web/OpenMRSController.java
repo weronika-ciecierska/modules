@@ -23,15 +23,15 @@ public abstract class OpenMRSController {
         return handleException(e);
     }
 
-    private String handleException(Exception e) {
-        logger.error(e.getMessage(), e);
-        return e.getMessage();
-    }
-
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseStatus(value = HttpStatus.CONFLICT)
     @ResponseBody
     public String handleIllegalArgumentException(IllegalArgumentException e) {
         return handleException(e);
+    }
+
+    private String handleException(Exception e) {
+        logger.error(e.getMessage(), e);
+        return e.getMessage();
     }
 }

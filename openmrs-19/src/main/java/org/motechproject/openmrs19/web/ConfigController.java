@@ -50,6 +50,4 @@ public class ConfigController extends OpenMRSController {
     public void setConfigService(OpenMRSConfigService configService) {
         this.configService = configService;
     }
-
-
 }

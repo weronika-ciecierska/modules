@@ -12,9 +12,12 @@ import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
 import org.motechproject.config.SettingsFacade;
+import org.motechproject.event.MotechEvent;
+import org.motechproject.event.listener.EventRelay;
 import org.motechproject.openmrs19.config.Config;
 import org.motechproject.openmrs19.config.Configs;
 import org.motechproject.openmrs19.service.OpenMRSConfigService;
+import org.motechproject.openmrs19.tasks.constants.EventSubjects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,11 +40,22 @@ public class OpenMRSConfigServiceImpl implements OpenMRSConfigService {
     @Autowired
     private SettingsFacade settingsFacade;
 
+    @Autowired
+    private EventRelay eventRelay;
+
     private Configs configs;
 
     @PostConstruct
     public void postConstruct() {
-        loadConfigs();
+        try (InputStream is = settingsFacade.getRawConfig(OPEN_MRS_CONFIGS_FILE_NAME)) {
+            String jsonText = IOUtils.toString(is);
+            Gson gson = new Gson();
+            configs = gson.fromJson(jsonText, Configs.class);
+        } catch (IOException e) {
+            throw new JsonIOException("Unable to read " + OPEN_MRS_CONFIGS_FILE_NAME, e);
+        } catch (RuntimeException e) {
+            throw new JsonIOException("Malformed " + OPEN_MRS_CONFIGS_FILE_NAME + " file", e);
+        }
     }
 
     @Override
@@ -49,7 +63,6 @@ public class OpenMRSConfigServiceImpl implements OpenMRSConfigService {
     public void deleteAllConfigs() {
         configs.getConfigs().clear();
         configs.setDefaultConfigName(null);
-        updateConfigs();
     }
 
     @Override
@@ -57,8 +70,10 @@ public class OpenMRSConfigServiceImpl implements OpenMRSConfigService {
     public void saveAllConfigs(Configs configs) {
         this.configs.setDefaultConfigName(configs.getDefaultConfigName());
         for (Config config : configs.getConfigs()) {
-            addConfig(config);
+            validateConfig(config);
+            this.configs.add(config);
         }
+        updateConfigs();
     }
 
     @Override
@@ -109,6 +124,7 @@ public class OpenMRSConfigServiceImpl implements OpenMRSConfigService {
         return configs.getByName(configs.getDefaultConfigName());
     }
 
+    @Override
     @Transactional
     public boolean verifyConfig(Config config) {
         HttpMethod method = new GetMethod(config.toInstancePath("/concept").toString());
@@ -129,23 +145,12 @@ public class OpenMRSConfigServiceImpl implements OpenMRSConfigService {
         return status == HttpStatus.SC_OK;
     }
 
-    private synchronized void loadConfigs() {
-        try (InputStream is = settingsFacade.getRawConfig(OPEN_MRS_CONFIGS_FILE_NAME)) {
-            String jsonText = IOUtils.toString(is);
-            Gson gson = new Gson();
-            configs = gson.fromJson(jsonText, Configs.class);
-        } catch (IOException e) {
-            throw new JsonIOException("Unable to read " + OPEN_MRS_CONFIGS_FILE_NAME, e);
-        } catch (RuntimeException e) {
-            throw new JsonIOException("Malformed " + OPEN_MRS_CONFIGS_FILE_NAME + " file", e);
-        }
-    }
-
     private void updateConfigs() {
         Gson gson = new Gson();
         String jsonText = gson.toJson(configs, Configs.class);
         ByteArrayResource resource = new ByteArrayResource(jsonText.getBytes());
         settingsFacade.saveRawConfig(OPEN_MRS_CONFIGS_FILE_NAME, resource);
+        eventRelay.sendEventMessage(new MotechEvent(EventSubjects.CONFIG_CHANGE_EVENT));
     }
 
 }
